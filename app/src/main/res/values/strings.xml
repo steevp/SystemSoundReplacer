@@ -1,0 +1,12 @@
+<resources>
+    <string name="app_name">System Sound Replacer</string>
+    <string name="file_chooser_title">Choose a file</string>
+    <string name="loading">Loading…</string>
+    <string name="error_dialog_title">Error</string>
+    <string name="error_dialog_message">Something went wrong. Please report a bug.</string>
+    <string name="success_dialog_title">Success</string>
+    <string name="success_dialog_message">You may need to reboot for the changes to take effect. Do you want to reboot now?</string>
+    <string name="dialog_positive">Yes</string>
+    <string name="dialog_negative">No</string>
+    <string name="confirm_dialog_title">Confirm</string>
+</resources>
