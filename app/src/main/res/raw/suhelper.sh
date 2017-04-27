@@ -22,7 +22,7 @@ make_backup() {
 replace_file() {
   [ $# -eq 2 ] || exit 1
   if [ -r "$1" -a -r "$2" ]; then
-    echo "Replacing $2 with $1"
+    echo "Replacing $1 with $2"
     cat "$2" > "$1"
     rm "$2"
   else
