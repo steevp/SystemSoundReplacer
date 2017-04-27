@@ -16,15 +16,13 @@ import com.steevsapps.systemsoundreplacer.R;
 import com.steevsapps.systemsoundreplacer.adapters.SystemSoundAdapter;
 import com.steevsapps.systemsoundreplacer.dialogs.ConfirmDialog;
 import com.steevsapps.systemsoundreplacer.dialogs.ErrorDialog;
+import com.steevsapps.systemsoundreplacer.utils.Shell;
 
-import java.io.BufferedReader;
-import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileFilter;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -133,28 +131,15 @@ public class MainActivity extends AppCompatActivity implements SystemSoundAdapte
                 script, original, replacement);
         Log.i(TAG, cmd);
         try {
-            Process p = Runtime.getRuntime().exec("su");
-            DataOutputStream dos = new DataOutputStream(p.getOutputStream());
-            dos.writeBytes(cmd + "\n");
-            dos.writeBytes("exit $?\n");
-            dos.flush();
-            dos.close();
-
-            BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(p.getInputStream()));
-            StringBuilder result = new StringBuilder();
-            String line = "";
-            while ((line = bufferedReader.readLine()) != null) {
-                result.append(line);
-            }
-            Log.i(TAG, result.toString());
-            int returnCode = p.waitFor();
-            if (returnCode == 0) {
+            Shell.Result result = Shell.runAsRoot(cmd);
+            Log.i(TAG, result.output);
+            if (result.returnCode == 0) {
                 return true;
             }
         } catch (Exception e) {
             e.printStackTrace();
-            showError();
         }
+
         return false;
     }
 
@@ -170,12 +155,7 @@ public class MainActivity extends AppCompatActivity implements SystemSoundAdapte
             @Override
             public void onYesClicked() {
                 try {
-                    Process p = Runtime.getRuntime().exec("su");
-                    DataOutputStream dos = new DataOutputStream(p.getOutputStream());
-                    dos.writeBytes("reboot\n");
-                    dos.writeBytes("exit\n");
-                    dos.flush();
-                    dos.close();
+                    Shell.runAsRoot("reboot");
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
@@ -227,22 +207,9 @@ public class MainActivity extends AppCompatActivity implements SystemSoundAdapte
                 script, mSelectedSound);
         Log.i(TAG, cmd);
         try {
-            Process p = Runtime.getRuntime().exec("su");
-            DataOutputStream dos = new DataOutputStream(p.getOutputStream());
-            dos.writeBytes(cmd + "\n");
-            dos.writeBytes("exit $?\n");
-            dos.flush();
-            dos.close();
-
-            BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(p.getInputStream()));
-            StringBuilder result = new StringBuilder();
-            String line = "";
-            while ((line = bufferedReader.readLine()) != null) {
-                result.append(line);
-            }
-            Log.i(TAG, result.toString());
-            int returnCode = p.waitFor();
-            if (returnCode == 0) {
+            Shell.Result result = Shell.runAsRoot(cmd);
+            Log.i(TAG, result.output);
+            if (result.returnCode == 0) {
                 return true;
             }
         } catch (Exception e) {

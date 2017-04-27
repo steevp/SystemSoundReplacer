@@ -2,12 +2,12 @@ package com.steevsapps.systemsoundreplacer;
 
 import android.support.test.runner.AndroidJUnit4;
 
+import com.steevsapps.systemsoundreplacer.utils.Shell;
+
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
-import java.io.DataOutputStream;
-
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
 
 /**
  * Check that remount,rw works
@@ -18,13 +18,8 @@ public class MountRwTest {
 
     @Test
     public void mountRw() throws Exception {
-        Process p = Runtime.getRuntime().exec("su");
-        DataOutputStream dos = new DataOutputStream(p.getOutputStream());
-        dos.writeBytes(cmd + "\n");
-        dos.writeBytes("exit $?\n");
-        dos.close();
-        int returnCode = p.waitFor();
-        assertEquals(0, returnCode);
+        Shell.Result result = Shell.runAsRoot(cmd);
+        assertEquals(0, result.returnCode);
     }
 
 }
