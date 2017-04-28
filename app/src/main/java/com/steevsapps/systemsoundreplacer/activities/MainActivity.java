@@ -30,7 +30,6 @@ public class MainActivity extends AppCompatActivity implements SystemSoundAdapte
     public final static String TAG = "com.steevsapps.TAG";
 
     private RecyclerView mRecyclerView;
-    private LinearLayoutManager mLayoutManager;
     private SystemSoundAdapter mAdapter;
     private String mSoundFolder = "/system/media/audio/ui/";
     private ProgressDialog mDialog;
@@ -47,8 +46,7 @@ public class MainActivity extends AppCompatActivity implements SystemSoundAdapte
 
         mRecyclerView = (RecyclerView) findViewById(R.id.recycler_view);
         mRecyclerView.setHasFixedSize(true);
-        mLayoutManager = new LinearLayoutManager(mRecyclerView.getContext());
-        mRecyclerView.setLayoutManager(mLayoutManager);
+        mRecyclerView.setLayoutManager(new LinearLayoutManager(mRecyclerView.getContext()));
 
         mDialog = new ProgressDialog(this);
         mDialog.setIndeterminate(true);
@@ -84,6 +82,7 @@ public class MainActivity extends AppCompatActivity implements SystemSoundAdapte
         FileOutputStream output = null;
         try {
             byte[] buffer = new byte[input.available()];
+            //noinspection ResultOfMethodCallIgnored
             input.read(buffer);
             output = new FileOutputStream(of);
             output.write(buffer);
@@ -255,8 +254,10 @@ public class MainActivity extends AppCompatActivity implements SystemSoundAdapte
                 byte[] buffer = new byte[4 * 1024];
                 int read;
 
-                while ((read = input.read(buffer)) != -1) {
-                    output.write(buffer, 0, read);
+                if (input != null) {
+                    while ((read = input.read(buffer)) != -1) {
+                        output.write(buffer, 0, read);
+                    }
                 }
                 output.flush();
             } catch (Exception e) {
@@ -279,7 +280,8 @@ public class MainActivity extends AppCompatActivity implements SystemSoundAdapte
                 }
             }
 
-            if (mSelectedSound != null && tmpFile != null) {
+            //noinspection SimplifiableIfStatement
+            if (mSelectedSound != null) {
                 // Replace the file
                 return replaceFile(mSelectedSound, tmpFile.getAbsolutePath());
             }

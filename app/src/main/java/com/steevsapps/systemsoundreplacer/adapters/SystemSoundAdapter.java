@@ -52,13 +52,13 @@ public class SystemSoundAdapter extends RecyclerView.Adapter<SystemSoundAdapter.
         return mDataSet.size();
     }
 
-    public static class ViewHolder extends RecyclerView.ViewHolder {
+    static class ViewHolder extends RecyclerView.ViewHolder {
         private TextView mSoundFile;
         private ImageView mPlayButton;
         private ImageView mOpenButton;
         private ImageView mRestoreButton;
 
-        public ViewHolder(View itemView) {
+        ViewHolder(View itemView) {
             super(itemView);
             mSoundFile = (TextView) itemView.findViewById(R.id.sound_file);
             mPlayButton = (ImageView) itemView.findViewById(R.id.play_button);
@@ -66,7 +66,7 @@ public class SystemSoundAdapter extends RecyclerView.Adapter<SystemSoundAdapter.
             mRestoreButton = (ImageView) itemView.findViewById(R.id.resore_button);
         }
 
-        public void bind(final String soundFile, final ItemClickedListener listener, String soundFolder) {
+        void bind(final String soundFile, final ItemClickedListener listener, String soundFolder) {
             mSoundFile.setText(soundFile);
             mPlayButton.setOnClickListener(new View.OnClickListener() {
                 @Override
