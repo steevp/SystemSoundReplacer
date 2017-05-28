@@ -3,6 +3,7 @@ package com.steevsapps.systemsoundreplacer.activities;
 import android.app.ProgressDialog;
 import android.content.Intent;
 import android.media.MediaPlayer;
+import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.support.v4.app.Fragment;
@@ -30,19 +31,21 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class MainActivity extends AppCompatActivity
-        implements SystemSoundAdapter.ItemClickedListener, TaskCallbacks {
+        implements SystemSoundAdapter.ItemClickedListener, TaskCallbacks, ConfirmDialog.DialogListener {
+
     private final static String TAG = "com.steevsapps.TAG";
-
-    private final static String SOUND_FOLDER = "/system/media/audio/ui/";
-
-    // Tag for the AsyncTask fragments
     private final static String TAG_TASK_FRAGMENT = "TAG_TASK_FRAGMENT";
+    private final static String SOUND_FOLDER = "/system/media/audio/ui/";
+    private final static String SELECTED_SOUND = "SELECTED_SOUND";
+    private final static String REPLACEMENT_SOUND = "REPLACEMENT_SOUND";
+
 
     private RecyclerView mRecyclerView;
     private SystemSoundAdapter mAdapter;
     private ProgressDialog mDialog;
     private MediaPlayer mMediaPlayer;
     private String mSelectedSound;
+    private Uri mReplacementSound;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -63,6 +66,11 @@ public class MainActivity extends AppCompatActivity
 
         mMediaPlayer = new MediaPlayer();
 
+        if (savedInstanceState != null) {
+            mSelectedSound = savedInstanceState.getString(SELECTED_SOUND);
+            mReplacementSound = savedInstanceState.getParcelable(REPLACEMENT_SOUND);
+        }
+
         // Extract the helper script
         File f = new File(getApplicationInfo().dataDir, "suhelper.sh");
         if (!f.exists()) {
@@ -82,6 +90,13 @@ public class MainActivity extends AppCompatActivity
     protected void onDestroy() {
         super.onDestroy();
         mMediaPlayer.release();
+    }
+
+    @Override
+    protected void onSaveInstanceState(Bundle outState) {
+        super.onSaveInstanceState(outState);
+        outState.putString(SELECTED_SOUND, mSelectedSound);
+        outState.putParcelable(REPLACEMENT_SOUND, mReplacementSound);
     }
 
     /**
@@ -142,17 +157,7 @@ public class MainActivity extends AppCompatActivity
 
     private void showSuccess() {
         ConfirmDialog dialog = ConfirmDialog.newInstance(getString(R.string.success_dialog_title),
-                getString(R.string.success_dialog_message));
-        dialog.setListener(new ConfirmDialog.DialogListener() {
-            @Override
-            public void onYesClicked() {
-                try {
-                    Shell.runAsRoot("reboot");
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-            }
-        });
+                getString(R.string.success_dialog_message), "reboot");
         dialog.show(getSupportFragmentManager(), "success_dialog");
     }
 
@@ -181,18 +186,7 @@ public class MainActivity extends AppCompatActivity
     public void askRestoreSound(final String soundFile) {
         mSelectedSound = SOUND_FOLDER + soundFile;
         ConfirmDialog dialog = ConfirmDialog.newInstance(getString(R.string.confirm_dialog_title),
-                "Are you sure you want to restore " + mSelectedSound + "?");
-        dialog.setListener(new ConfirmDialog.DialogListener() {
-            @Override
-            public void onYesClicked() {
-                // Restore the file
-                RestoreFileTaskFragment taskFragment = RestoreFileTaskFragment.newInstance(
-                        getApplicationInfo().dataDir + "/suhelper.sh",
-                        mSelectedSound);
-                FragmentManager fm = getSupportFragmentManager();
-                fm.beginTransaction().add(taskFragment, TAG_TASK_FRAGMENT).commit();
-            }
-        });
+                "Are you sure you want to restore " + mSelectedSound + "?", "restore");
         dialog.show(getSupportFragmentManager(), "dialog");
     }
 
@@ -200,19 +194,9 @@ public class MainActivity extends AppCompatActivity
     protected void onActivityResult(int requestCode, int resultCode, final Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == 123 && resultCode == RESULT_OK) {
+            mReplacementSound = data.getData();
             ConfirmDialog dialog = ConfirmDialog.newInstance(getString(R.string.confirm_dialog_title),
-                    "Are you sure you want to replace " + mSelectedSound + "?");
-            dialog.setListener(new ConfirmDialog.DialogListener() {
-                @Override
-                public void onYesClicked() {
-                    FragmentManager fm = getSupportFragmentManager();
-                    ReplaceFileTaskFragment taskFragment = ReplaceFileTaskFragment.newInstance(
-                                getApplicationInfo().dataDir + "/suhelper.sh",
-                                mSelectedSound,
-                                data.getData());
-                    fm.beginTransaction().add(taskFragment, TAG_TASK_FRAGMENT).commit();
-                }
-            });
+                    "Are you sure you want to replace " + mSelectedSound + "?", "replace");
             dialog.show(getSupportFragmentManager(), "dialog");
         }
     }
@@ -236,6 +220,35 @@ public class MainActivity extends AppCompatActivity
             mAdapter.notifyDataSetChanged();
         } else {
             showError();
+        }
+    }
+
+    @Override
+    public void onYesClicked(String tag) {
+        FragmentManager fm = getSupportFragmentManager();
+        switch (tag) {
+            case "replace":
+                // Replace the file
+                ReplaceFileTaskFragment replaceTask = ReplaceFileTaskFragment.newInstance(
+                        getApplicationInfo().dataDir + "/suhelper.sh",
+                        mSelectedSound,
+                        mReplacementSound);
+                fm.beginTransaction().add(replaceTask, TAG_TASK_FRAGMENT).commit();
+                break;
+            case "restore":
+                // Restore the file
+                RestoreFileTaskFragment restoreTask = RestoreFileTaskFragment.newInstance(
+                        getApplicationInfo().dataDir + "/suhelper.sh",
+                        mSelectedSound);
+                fm.beginTransaction().add(restoreTask, TAG_TASK_FRAGMENT).commit();
+                break;
+            case "reboot":
+                try {
+                    Shell.runAsRoot("reboot");
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+                break;
         }
     }
 }
