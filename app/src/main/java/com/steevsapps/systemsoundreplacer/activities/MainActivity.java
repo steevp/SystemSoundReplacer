@@ -3,19 +3,22 @@ package com.steevsapps.systemsoundreplacer.activities;
 import android.app.ProgressDialog;
 import android.content.Intent;
 import android.media.MediaPlayer;
-import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
+import android.support.v4.app.Fragment;
+import android.support.v4.app.FragmentManager;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.support.v7.widget.Toolbar;
-import android.util.Log;
 
 import com.steevsapps.systemsoundreplacer.R;
 import com.steevsapps.systemsoundreplacer.adapters.SystemSoundAdapter;
 import com.steevsapps.systemsoundreplacer.dialogs.ConfirmDialog;
 import com.steevsapps.systemsoundreplacer.dialogs.ErrorDialog;
+import com.steevsapps.systemsoundreplacer.tasks.ReplaceFileTaskFragment;
+import com.steevsapps.systemsoundreplacer.tasks.RestoreFileTaskFragment;
+import com.steevsapps.systemsoundreplacer.tasks.TaskCallbacks;
 import com.steevsapps.systemsoundreplacer.utils.Shell;
 
 import java.io.File;
@@ -26,12 +29,17 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 
-public class MainActivity extends AppCompatActivity implements SystemSoundAdapter.ItemClickedListener {
-    public final static String TAG = "com.steevsapps.TAG";
+public class MainActivity extends AppCompatActivity
+        implements SystemSoundAdapter.ItemClickedListener, TaskCallbacks {
+    private final static String TAG = "com.steevsapps.TAG";
+
+    private final static String SOUND_FOLDER = "/system/media/audio/ui/";
+
+    // Tag for the AsyncTask fragments
+    private final static String TAG_TASK_FRAGMENT = "TAG_TASK_FRAGMENT";
 
     private RecyclerView mRecyclerView;
     private SystemSoundAdapter mAdapter;
-    private String mSoundFolder = "/system/media/audio/ui/";
     private ProgressDialog mDialog;
     private MediaPlayer mMediaPlayer;
     private String mSelectedSound;
@@ -76,6 +84,9 @@ public class MainActivity extends AppCompatActivity implements SystemSoundAdapte
         mMediaPlayer.release();
     }
 
+    /**
+     * Extract the helper script from res/raw
+     */
     private void extractHelper() {
         File of = new File(getApplicationInfo().dataDir, "suhelper.sh");
         InputStream input = getResources().openRawResource(R.raw.suhelper);
@@ -108,7 +119,7 @@ public class MainActivity extends AppCompatActivity implements SystemSoundAdapte
     }
 
     private void listSoundFiles() {
-        File f = new File(mSoundFolder);
+        File f = new File(SOUND_FOLDER);
         File[] files = f.listFiles(new FileFilter() {
             @Override
             public boolean accept(File file) {
@@ -120,26 +131,8 @@ public class MainActivity extends AppCompatActivity implements SystemSoundAdapte
         for (File af: files) {
             soundList.add(af.getName());
         }
-        mAdapter = new SystemSoundAdapter(this, soundList, mSoundFolder);
+        mAdapter = new SystemSoundAdapter(this, soundList, SOUND_FOLDER);
         mRecyclerView.setAdapter(mAdapter);
-    }
-
-    private boolean replaceFile(String original, String replacement) {
-        String script = getApplicationInfo().dataDir + "/suhelper.sh";
-        String cmd = String.format("/system/bin/sh %s replace \"%s\" \"%s\"",
-                script, original, replacement);
-        Log.i(TAG, cmd);
-        try {
-            Shell.Result result = Shell.runAsRoot(cmd);
-            Log.i(TAG, result.output);
-            if (result.returnCode == 0) {
-                return true;
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-
-        return false;
     }
 
     private void showError() {
@@ -167,7 +160,7 @@ public class MainActivity extends AppCompatActivity implements SystemSoundAdapte
     public void playSound(String soundFile) {
         try {
             mMediaPlayer.reset();
-            mMediaPlayer.setDataSource(mSoundFolder + soundFile);
+            mMediaPlayer.setDataSource(SOUND_FOLDER + soundFile);
             mMediaPlayer.prepare();
             mMediaPlayer.start();
         } catch (IOException e) {
@@ -177,7 +170,7 @@ public class MainActivity extends AppCompatActivity implements SystemSoundAdapte
 
     @Override
     public void openSound(String soundFile) {
-        mSelectedSound = mSoundFolder + soundFile;
+        mSelectedSound = SOUND_FOLDER + soundFile;
         Intent intent = new Intent();
         intent.setType("application/ogg");
         intent.setAction(Intent.ACTION_GET_CONTENT);
@@ -186,35 +179,21 @@ public class MainActivity extends AppCompatActivity implements SystemSoundAdapte
 
     @Override
     public void askRestoreSound(final String soundFile) {
-        mSelectedSound = mSoundFolder + soundFile;
+        mSelectedSound = SOUND_FOLDER + soundFile;
         ConfirmDialog dialog = ConfirmDialog.newInstance(getString(R.string.confirm_dialog_title),
                 "Are you sure you want to restore " + mSelectedSound + "?");
         dialog.setListener(new ConfirmDialog.DialogListener() {
             @Override
             public void onYesClicked() {
                 // Restore the file
-                new RestoreFileTask().execute(soundFile);
+                RestoreFileTaskFragment taskFragment = RestoreFileTaskFragment.newInstance(
+                        getApplicationInfo().dataDir + "/suhelper.sh",
+                        mSelectedSound);
+                FragmentManager fm = getSupportFragmentManager();
+                fm.beginTransaction().add(taskFragment, TAG_TASK_FRAGMENT).commit();
             }
         });
         dialog.show(getSupportFragmentManager(), "dialog");
-    }
-
-    private boolean restoreSound(String soundFile) {
-        mSelectedSound = mSoundFolder + soundFile;
-        String script = getApplicationInfo().dataDir + "/suhelper.sh";
-        String cmd = String.format("/system/bin/sh %s restore \"%s\"",
-                script, mSelectedSound);
-        Log.i(TAG, cmd);
-        try {
-            Shell.Result result = Shell.runAsRoot(cmd);
-            Log.i(TAG, result.output);
-            if (result.returnCode == 0) {
-                return true;
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        return false;
     }
 
     @Override
@@ -226,101 +205,37 @@ public class MainActivity extends AppCompatActivity implements SystemSoundAdapte
             dialog.setListener(new ConfirmDialog.DialogListener() {
                 @Override
                 public void onYesClicked() {
-                    new ReplaceFileTask().execute(data.getData());
+                    FragmentManager fm = getSupportFragmentManager();
+                    ReplaceFileTaskFragment taskFragment = ReplaceFileTaskFragment.newInstance(
+                                getApplicationInfo().dataDir + "/suhelper.sh",
+                                mSelectedSound,
+                                data.getData());
+                    fm.beginTransaction().add(taskFragment, TAG_TASK_FRAGMENT).commit();
                 }
             });
             dialog.show(getSupportFragmentManager(), "dialog");
         }
     }
 
-    private class ReplaceFileTask extends AsyncTask<Uri,Void,Boolean> {
-
-        @Override
-        protected void onPreExecute() {
-            mDialog.show();
-        }
-
-        @Override
-        protected Boolean doInBackground(Uri... params) {
-            // Retrieve file from Content Provider first
-            InputStream input = null;
-            FileOutputStream output = null;
-            File tmpFile = null;
-            try {
-                input = getContentResolver().openInputStream(params[0]);
-                tmpFile = File.createTempFile("fileToCopy", ".ogg", getExternalCacheDir());
-                output = new FileOutputStream(tmpFile);
-
-                byte[] buffer = new byte[4 * 1024];
-                int read;
-
-                if (input != null) {
-                    while ((read = input.read(buffer)) != -1) {
-                        output.write(buffer, 0, read);
-                    }
-                }
-                output.flush();
-            } catch (Exception e) {
-                e.printStackTrace();
-                return false;
-            } finally {
-                if (input != null) {
-                    try {
-                        input.close();
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-                }
-                if (output != null) {
-                    try {
-                        output.close();
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-                }
-            }
-
-            //noinspection SimplifiableIfStatement
-            if (mSelectedSound != null) {
-                // Replace the file
-                return replaceFile(mSelectedSound, tmpFile.getAbsolutePath());
-            }
-
-            return false;
-        }
-
-        @Override
-        protected void onPostExecute(Boolean result) {
-            mDialog.dismiss();
-            if (result) {
-                showSuccess();
-                mAdapter.notifyDataSetChanged();
-            } else {
-                showError();
-            }
-        }
+    @Override
+    public void onPreExecute() {
+        mDialog.show();
     }
 
-    private class RestoreFileTask extends AsyncTask<String,Void,Boolean> {
-        @Override
-        protected void onPreExecute() {
-            mDialog.show();
+    @Override
+    public void onPostExecute(Boolean result) {
+        mDialog.dismiss();
+        // Remove task fragment
+        FragmentManager fm = getSupportFragmentManager();
+        Fragment fragment = fm.findFragmentByTag(TAG_TASK_FRAGMENT);
+        if (fragment != null) {
+            fm.beginTransaction().remove(fragment).commit();
         }
-
-        @Override
-        protected Boolean doInBackground(String... params) {
-            return restoreSound(params[0]);
-        }
-
-        @Override
-        protected void onPostExecute(Boolean result) {
-            mDialog.dismiss();
-            if (result) {
-                showSuccess();
-                mAdapter.notifyDataSetChanged();
-            } else {
-                showError();
-            }
+        if (result) {
+            showSuccess();
+            mAdapter.notifyDataSetChanged();
+        } else {
+            showError();
         }
     }
 }
